@@ -36,6 +36,28 @@ var negativeSpace = 6;
 /** Ten primes used to seed the linear congruential generator. */
 var primes = [53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
 
+/** Number -> string mapping. Ensure that the array size matches the maximum x value (15). */
+var numbers = [
+	"ZERO", /* For simplicity */
+	"ONE", "TWO", "THREE", "FOUR", "FIVE",
+	"SIX", "SEVEN", "EIGHT", "NINE", "TEN",
+	"ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN",
+];
+
+/** Fonts. */
+var fonts = {};
+
+/**
+ *  Load given fonts into global *fonts* array.
+ *  
+ *  @param fontList		Font name => url map.
+ */
+function loadFonts(fontList) {
+	$.each(fontList, function(name, url) {
+		fonts[name] = new FontFile(url, function() {console.log("Font loaded", url);});
+	});
+}
+
 /**
  * Generate increment value for linear congruential generator.
  *
@@ -185,7 +207,7 @@ function project(c, p, y) {
  * Compute a piece from its serial number.
  *
  *  @param sn           The piece serial number.
- *  @param options      Piece options: cropped, trapezoidal.
+ *  @param options      Piece options: cropped, trapezoidal, font.
  *
  *  @return The piece object.
  */
@@ -376,6 +398,35 @@ function computePiece(sn, options) {
             }
         }
     }
+	
+	//
+	// 7. Fit text into slots.
+	//
+	
+    for (var iSlot = 0; iSlot < slots.length; iSlot++) {
+        var slot = slots[iSlot];
+		slot.glyphs = [];
+		var glyphs = options.font.opentype.stringToGlyphs(numbers[slot.shims.length]);
+		console.log(slot.shims.length, numbers[slot.shims.length], glyphs);
+		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
+			var glyph = glyphs[iGlyph];
+			var height = side / glyphs.length;
+			// TODO coordinates.
+			var path = glyph.getPath(0, height, height);
+			var segments = [];
+			for (var i=0; i < path.commands.length; i++) {
+				var command = path.commands[i];
+				switch (command.type) {
+					case 'M': segments[i] = "M " + command.x + " " + command.y; break;
+					case 'L': segments[i] = "L " + command.x + " " + command.y; break;
+					case 'C': segments[i] = "C " + command.x1 + " " + command.y1 + " " + command.x2 + " " + command.y2 + " " + command.x + " " + command.y; break;
+					case 'Q': segments[i] = "Q " + command.x1 + " " + command.y1 + " " + command.x + " " + command.y; break;
+					case 'Z': segments[i] = "Z"; break;
+				}
+			}
+			slot.glyphs[iGlyph] = segments.join(" ");
+		}
+	}
     
     return {sn: sn, slots: slots, bbox: {x: x, y: y, x2: x2, y2: y2}};
 }
@@ -393,6 +444,7 @@ function drawSVG(piece, element) {
     svg.clear();
     for (var iSlot = 0; iSlot < piece.slots.length; iSlot++) {
         var slot = piece.slots[iSlot];
+        // TODO
         for (var iShim = 0; iShim < slot.shims.length; iShim++) {
             var shim = slot.shims[iShim];
             var coords = Array();
@@ -401,6 +453,9 @@ function drawSVG(piece, element) {
             }
             svg.polygon(coords).attr('class', "shim");
         }
+		for (var iGlyph = 0; iGlyph < slot.glyphs.length; iGlyph++) {
+			svg.path(slot.glyphs[iGlyph]);
+		}
     }
     svg.rect(
         piece.bbox.x, piece.bbox.y,
@@ -453,7 +508,7 @@ function drawPDF(piece, pdf, scale, offX, offY) {
  * Generate a multi-page PDF from a set of pieces.
  *
  *
- *  @param pieceOptions     Piece options: cropped, trapezoidal.
+ *  @param pieceOptions     Piece options: cropped, trapezoidal, font.
  *  @param printOptions     Print options:
  *                          - orient    Orientation ('portrait', 'landscape').
  *                          - format    Page format ('a3', 'a4','a5' ,'letter' ,'legal').
@@ -663,7 +718,7 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
             }
         }
         
-        // Compute piece/
+        // Compute piece.
         var sn = generatePermutation(i, c, x, y)
         var piece = computePiece(sn, pieceOptions);
 
@@ -1131,7 +1186,8 @@ function updatePiece(element) {
     // Generate piece.
     var piece = computePiece(sn, {
         cropped: $("#cropped").prop('checked'), 
-        trapezoidal:$("#trapezoidal").prop('checked')
+        trapezoidal:$("#trapezoidal").prop('checked'),
+		font: fonts["Impact"], //TODO
     });
     
     // Output to SVG.
@@ -1208,7 +1264,8 @@ function downloadSVG(sn) {
     // Generate piece.
     var piece = computePiece(sn, {
         cropped: $("#cropped").prop('checked'), 
-        trapezoidal:$("#trapezoidal").prop('checked')
+        trapezoidal:$("#trapezoidal").prop('checked'),
+		font: fonts["Impact"], //TODO
     });
     
     // Output to SVG.
@@ -1258,7 +1315,8 @@ function downloadPDF() {
     piecesToPDF(
         {
             cropped: $("#cropped").prop('checked'),
-            trapezoidal: $("#trapezoidal").prop('checked')
+            trapezoidal: $("#trapezoidal").prop('checked'),
+			font: fonts["Impact"], //TODO
         },
         {
             orient: $("[name='orient']:checked").val(), 

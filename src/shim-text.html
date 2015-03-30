@@ -4,15 +4,18 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>The Shim Project</title>
+    <title>The Shim Project - Text Version</title>
 
     <!-- jQuery -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     
     <!-- Bootstrap -->
-    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
-    <script src="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    
+    <!-- OpenType.js -->
+    <script src="opentype.min.js"></script>
     
     <!-- Snap.svg -->
     <script src="snap.svg-min.js"></script>
@@ -27,14 +30,24 @@
     <script src="jszip.min.js"></script>
 
     <!-- Our stuff -->
-    <script src="shim.js"></script>
+    <script src="FontFile.js"></script>
+    <script src="shim-text.js"></script>
+	<script>
+	loadFonts({
+		"Myriad Pro" 			: "fonts/MyriadPro.otf", 
+		"Braggadocio"			: "fonts/Braggadocio.ttf",
+		"Geneva"				: "fonts/Geneva.ttf",
+		"Gill Sans Ultra Bold"	: "fonts/GillSans-UtraBold.ttf",
+		"Impact"				: "fonts/Impact.ttf",
+	});
+	</script>
     
     <link rel="stylesheet" href="shim.css">
 </head>
 <body>
     <div class="container">
         <div class="page-header">
-            <h1>The Shim Project</h1>
+            <h1>The Shim Project - Text Version</h1>
         </div>
         
         <!-- Parameters -->
