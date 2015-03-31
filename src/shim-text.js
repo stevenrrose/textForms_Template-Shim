@@ -189,7 +189,7 @@ function rotate(c, p, angle) {
 }
 
 /**
- * Project line passing trought *c* and *p* on horizontal line at *y*.
+ * Project line passing through *c* and *p* on horizontal line at *y*.
  *
  *  @param c, p     Points on line to project.
  *  @param y        Y-coordinate of line to project onto.
@@ -201,6 +201,36 @@ function project(c, p, y) {
         x: c.x + (p.x-c.x) / (p.y-c.y) * (y-c.y),
         y: y
     };
+}
+
+/**
+ *  Interpolate point between *p1* and *p2* at linear position *p*.
+ *  
+ *  *p* = 0 -> *p1*
+ *  *p* = 1 -> *p2*
+ */
+function interpolate(p1, p2, p) {
+	return {
+		x: (p1.x + p * (p2.x-p1.x)),
+		y: (p1.y + p * (p2.y-p1.y))
+	};
+}
+
+/**
+ *  Map point *p* in uniform coordinates into trapeze defined by points *p1*-*p2*-*p3*-*p4*.
+ *  
+ *  *p* = (0,0) -> *p1*
+ *  *p* = (0,1) -> *p2*
+ *  *p* = (1,1) -> *p3*
+ *  *p* = (1,0) -> *p4*
+ */
+function trapezeMap(p1, p2, p3, p4, p) {
+	// First compute linear interpolations of p.x along (p1,p4) and (p2,p3).
+	var p14 = interpolate(p1, p4, p.x),
+		p23 = interpolate(p2, p3, p.x);
+		
+	// Then compute linear interpolation of p.y along (p14,p23).
+	return interpolate(p14, p23, p.y);
 }
 
 /**
@@ -405,24 +435,38 @@ function computePiece(sn, options) {
 	
     for (var iSlot = 0; iSlot < slots.length; iSlot++) {
         var slot = slots[iSlot];
+		
+		// Trapeze coordinates.
+		var firstShim = slot.shims[0], lastShim = slot.shims[slot.shims.length-1];
+		var p1 = slot.upward > 0 ? firstShim[0] : firstShim[1], 
+			p2 = slot.upward > 0 ? firstShim[1] : firstShim[0],
+			p3 = slot.upward > 0 ? lastShim[2]  : lastShim[options.trapezoidal ? 3 : 0],
+			p4 = slot.upward > 0 ? lastShim[options.trapezoidal ? 3 : 0] : lastShim[2];
+		
 		slot.glyphs = [];
 		var glyphs = options.font.opentype.stringToGlyphs(numbers[slot.shims.length]);
-		console.log(slot.shims.length, numbers[slot.shims.length], glyphs);
 		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
 			var glyph = glyphs[iGlyph];
-			var height = side / glyphs.length;
-			// TODO coordinates.
-			var path = glyph.getPath(0, height, height);
+			var height = 1.0 / glyphs.length;
+			var path = glyph.getPath(0, height * (iGlyph+1), height);
 			var segments = [];
-			for (var i=0; i < path.commands.length; i++) {
-				var command = path.commands[i];
+			for (var iCommand = 0; iCommand < path.commands.length; iCommand++) {
+				var command = path.commands[iCommand];
+				var coords = [];
+				var xScale = glyphs.length*2;//TODO
+				// TODO bounding box etc
 				switch (command.type) {
-					case 'M': segments[i] = "M " + command.x + " " + command.y; break;
-					case 'L': segments[i] = "L " + command.x + " " + command.y; break;
-					case 'C': segments[i] = "C " + command.x1 + " " + command.y1 + " " + command.x2 + " " + command.y2 + " " + command.x + " " + command.y; break;
-					case 'Q': segments[i] = "Q " + command.x1 + " " + command.y1 + " " + command.x + " " + command.y; break;
-					case 'Z': segments[i] = "Z"; break;
+					case 'M': coords = [{x: command.x*xScale,  y: command.y}]; break;
+					case 'L': coords = [{x: command.x*xScale,  y: command.y}]; break;
+					case 'C': coords = [{x: command.x1*xScale, y: command.y1}, {x: command.x2*xScale, y: command.y2}, {x: command.x*xScale, y: command.yyScale}]; break;
+					case 'Q': coords = [{x: command.x1*xScale, y: command.y1}, {x: command.x*xScale,  y: command.y}]; break;
 				}
+				var segment = command.type;
+				for (var iCoord = 0; iCoord < coords.length; iCoord++) {
+					var c = trapezeMap(p1, p2, p3, p4, coords[iCoord]);
+					segment += " " + c.x + " " + c.y;
+				}
+				segments[iCommand] = segment;
 			}
 			slot.glyphs[iGlyph] = segments.join(" ");
 		}
