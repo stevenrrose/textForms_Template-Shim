@@ -60,6 +60,10 @@ function loadFonts(fontList) {
 		new FontFile(url, function(font) {
 			console.log("Font loaded", url); 
 			var name = font.opentype.familyName;
+			
+			// Sometimes the descender is positive whereas it should be below the baseline at y=0, fix it.
+			if (font.opentype.descender > 0) font.opentype.descender = -font.opentype.descender;
+			
 			fonts[name] = font;
 			computeNumberMetrics(name, font);
 			
@@ -87,8 +91,6 @@ function computeNumberMetrics(name, font) {
 		var baseline = 0;
 		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
 			var glyph = glyphs[iGlyph];
-			var width = glyph.xMax-glyph.xMin;
-			maxWidth = Math.max(maxWidth, width);
 			
 			baseline -= lineHeight; /* Top-down. */
 			var commands = [];
@@ -103,6 +105,28 @@ function computeNumberMetrics(name, font) {
 				}
 				commands[iCommand] = {type: command.type, coords: coords};
 			}
+
+			// - Compute real glyph bounding box, overriding values from opentype.js.
+			var xMin = Number.POSITIVE_INFINITY, xMax = Number.NEGATIVE_INFINITY,
+				yMin = Number.POSITIVE_INFINITY, yMax = Number.NEGATIVE_INFINITY;
+			for (var iCommand = 0; iCommand < commands.length; iCommand++) {
+				var command = commands[iCommand];
+				for (var iCoord = 0; iCoord < command.coords.length; iCoord++) {
+					var p = command.coords[iCoord];
+					xMin = Math.min(xMin, p.x);
+					xMax = Math.max(xMax, p.x);
+					yMin = Math.min(yMin, p.y);
+					yMax = Math.max(yMax, p.y);
+				}
+			}
+			glyph.xMin = xMin;
+			glyph.xMax = xMax;
+			glyph.yMin = yMin;
+			glyph.yMax = yMax;
+			
+			var width = glyph.xMax-glyph.xMin;
+			maxWidth = Math.max(maxWidth, width);
+			
 			paths[iGlyph] = commands;
 		}
 		
@@ -113,14 +137,14 @@ function computeNumberMetrics(name, font) {
 			var glyph = glyphs[iGlyph];
 			var width = glyph.xMax-glyph.xMin;
 			
-			var path = paths[iGlyph];
-			for (var iCommand = 0; iCommand < path.length; iCommand++) {
-				var command = path[iCommand];
+			var commands = paths[iGlyph];
+			for (var iCommand = 0; iCommand < commands.length; iCommand++) {
+				var command = commands[iCommand];
 				for (var iCoord = 0; iCoord < command.coords.length; iCoord++) {
 					var p = command.coords[iCoord];
 					
 					// - Center each glyph.
-					p.x += (maxWidth-width)/2;
+					p.x += (maxWidth-width)/2 - glyph.xMin;
 					
 					// - Compute bounding box.
 					xMin = Math.min(xMin, p.x);
@@ -581,7 +605,7 @@ function drawSVG(piece, element) {
             svg.polygon(coords).attr('class', "shim");
         }
 		for (var iGlyph = 0; iGlyph < slot.glyphs.length; iGlyph++) {
-			svg.path(slot.glyphs[iGlyph]);
+			svg.path(slot.glyphs[iGlyph]).attr({fill: 'black', stroke: 'none'});
 		}
     }
     svg.rect(
