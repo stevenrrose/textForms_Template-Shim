@@ -62,6 +62,9 @@ function loadFonts(fontList) {
 			var name = font.opentype.familyName;
 			fonts[name] = font;
 			computeNumberMetrics(name, font);
+			
+			// Add to select.
+			$("#font").append(new Option(name));
 		});
 	});
 }
@@ -1309,9 +1312,9 @@ function updatePiece(element) {
     
     // Generate piece.
     var piece = computePiece(sn, {
-        cropped: $("#cropped").prop('checked'), 
-        trapezoidal:$("#trapezoidal").prop('checked'),
-		font: "Impact", //TODO
+        cropped: 	 $("#cropped").prop('checked'), 
+        trapezoidal: $("#trapezoidal").prop('checked'),
+		font: 		 $("#font").val(),
     });
     
     // Output to SVG.
@@ -1387,9 +1390,9 @@ function updateSelected() {
 function downloadSVG(sn) {
     // Generate piece.
     var piece = computePiece(sn, {
-        cropped: $("#cropped").prop('checked'), 
-        trapezoidal:$("#trapezoidal").prop('checked'),
-		font: "Impact", //TODO
+        cropped:	 $("#cropped").prop('checked'), 
+        trapezoidal: $("#trapezoidal").prop('checked'),
+		font: 		 $("#font").val(),
     });
     
     // Output to SVG.
@@ -1438,9 +1441,9 @@ function downloadPDF() {
     $("#progressDialog").modal('show');
     piecesToPDF(
         {
-            cropped: $("#cropped").prop('checked'),
+            cropped: 	 $("#cropped").prop('checked'),
             trapezoidal: $("#trapezoidal").prop('checked'),
-			font: "Impact", //TODO
+			font:		 $("#font").val(),
         },
         {
             orient: $("[name='orient']:checked").val(), 
