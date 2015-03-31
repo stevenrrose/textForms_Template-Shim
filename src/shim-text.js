@@ -36,6 +36,9 @@ var negativeSpace = 6;
 /** Ten primes used to seed the linear congruential generator. */
 var primes = [53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
 
+/** Fonts. Content will be loaded by loadFonts() at startup. */
+var fonts = {};
+
 /** Number -> string mapping. Ensure that the array size matches the maximum x value (15). */
 var numbers = [
 	"ZERO", /* For simplicity */
@@ -44,18 +47,106 @@ var numbers = [
 	"ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN",
 ];
 
-/** Fonts. */
-var fonts = {};
+/** Number string paths for each font. */
+var numberPaths = {};
 
 /**
- *  Load given fonts into global *fonts* array.
+ *  Load given fonts into global *fonts* array, and compute metrics into *numberMetrics*.
  *  
  *  @param fontList		Font name => url map.
  */
 function loadFonts(fontList) {
-	$.each(fontList, function(name, url) {
-		fonts[name] = new FontFile(url, function() {console.log("Font loaded", url);});
+	$.each(fontList, function(i, url) {
+		new FontFile(url, function(font) {
+			console.log("Font loaded", url); 
+			var name = font.opentype.familyName;
+			fonts[name] = font;
+			computeNumberMetrics(name, font);
+		});
 	});
+}
+
+/**
+ *  Compute metrics for all number strings.
+ *  
+ *  @param name		Font name.
+ *  @param font		FontFile object.
+ */
+function computeNumberMetrics(name, font) {
+	numberPaths[name] = [];
+	for (var iNumber = 0; iNumber < numbers.length; iNumber++) {
+		var glyphs = font.opentype.stringToGlyphs(numbers[iNumber]);
+		
+		// - Compute raw coords for each glyph.
+		var paths = [];
+		var maxWidth = 0;
+		var lineHeight = font.opentype.ascender-font.opentype.descender;
+		var baseline = 0;
+		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
+			var glyph = glyphs[iGlyph];
+			var width = glyph.xMax-glyph.xMin;
+			maxWidth = Math.max(maxWidth, width);
+			
+			baseline -= lineHeight; /* Top-down. */
+			var commands = [];
+			for (var iCommand = 0; iCommand < glyph.path.commands.length; iCommand++) {
+				var command = glyph.path.commands[iCommand];
+				var coords = [];
+				switch (command.type) {
+					case 'M': coords = [{x: command.x,  y: (command.y  + baseline)}]; break;
+					case 'L': coords = [{x: command.x,  y: (command.y  + baseline)}]; break;
+					case 'C': coords = [{x: command.x1, y: (command.y1 + baseline)}, {x: command.x2, y: (command.y2 + baseline)}, {x: command.x, y: (command.y + baseline)}]; break;
+					case 'Q': coords = [{x: command.x1, y: (command.y1 + baseline)}, {x: command.x,  y: (command.y  + baseline)}]; break;
+				}
+				commands[iCommand] = {type: command.type, coords: coords};
+			}
+			paths[iGlyph] = commands;
+		}
+		
+		// - Center each glyph horizontally and compute bounding box.
+		var xMin = Number.POSITIVE_INFINITY, xMax = Number.NEGATIVE_INFINITY,
+			yMin = Number.POSITIVE_INFINITY, yMax = Number.NEGATIVE_INFINITY;
+		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
+			var glyph = glyphs[iGlyph];
+			var width = glyph.xMax-glyph.xMin;
+			
+			var path = paths[iGlyph];
+			for (var iCommand = 0; iCommand < path.length; iCommand++) {
+				var command = path[iCommand];
+				for (var iCoord = 0; iCoord < command.coords.length; iCoord++) {
+					var p = command.coords[iCoord];
+					
+					// - Center each glyph.
+					p.x += (maxWidth-width)/2;
+					
+					// - Compute bounding box.
+					xMin = Math.min(xMin, p.x);
+					xMax = Math.max(xMax, p.x);
+					yMin = Math.min(yMin, p.y);
+					yMax = Math.max(yMax, p.y);
+				}
+			}
+		}
+		
+		// - Normalize coords in (0,0)-(1,1) box.
+		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
+			var glyph = glyphs[iGlyph];
+			var width = glyph.xMax-glyph.xMin;
+			
+			var path = paths[iGlyph];
+			for (var iCommand = 0; iCommand < path.length; iCommand++) {
+				var command = path[iCommand];
+				for (var iCoord = 0; iCoord < command.coords.length; iCoord++) {
+					var p = command.coords[iCoord];
+					
+					p.x = (p.x - xMin) / (xMax - xMin);
+					p.y = (p.y - yMin) / (yMax - yMin);
+				}
+			}
+		}
+		
+		numberPaths[name][iNumber] = paths;
+	}
 }
 
 /**
@@ -204,7 +295,7 @@ function project(c, p, y) {
 }
 
 /**
- *  Interpolate point between *p1* and *p2* at linear position *p*.
+ *  Interpolate point between *p1* and *p2* at unit position *p*.
  *  
  *  *p* = 0 -> *p1*
  *  *p* = 1 -> *p2*
@@ -217,7 +308,7 @@ function interpolate(p1, p2, p) {
 }
 
 /**
- *  Map point *p* in uniform coordinates into trapeze defined by points *p1*-*p2*-*p3*-*p4*.
+ *  Map point *p* in unit coordinates into trapeze defined by points *p1*-*p2*-*p3*-*p4*.
  *  
  *  *p* = (0,0) -> *p1*
  *  *p* = (0,1) -> *p2*
@@ -438,37 +529,26 @@ function computePiece(sn, options) {
 		
 		// Trapeze coordinates.
 		var firstShim = slot.shims[0], lastShim = slot.shims[slot.shims.length-1];
-		var p1 = slot.upward > 0 ? firstShim[0] : firstShim[1], 
-			p2 = slot.upward > 0 ? firstShim[1] : firstShim[0],
-			p3 = slot.upward > 0 ? lastShim[2]  : lastShim[options.trapezoidal ? 3 : 0],
-			p4 = slot.upward > 0 ? lastShim[options.trapezoidal ? 3 : 0] : lastShim[2];
+		var p1 = slot.upward < 0 ? firstShim[0] : firstShim[1], 
+			p2 = slot.upward < 0 ? firstShim[1] : firstShim[0],
+			p3 = slot.upward < 0 ? lastShim[2]  : lastShim[options.trapezoidal ? 3 : 0],
+			p4 = slot.upward < 0 ? lastShim[options.trapezoidal ? 3 : 0] : lastShim[2];
 		
+		var glyphs = numberPaths[options.font][slot.shims.length];
 		slot.glyphs = [];
-		var glyphs = options.font.opentype.stringToGlyphs(numbers[slot.shims.length]);
 		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
 			var glyph = glyphs[iGlyph];
-			var height = 1.0 / glyphs.length;
-			var path = glyph.getPath(0, height * (iGlyph+1), height);
-			var segments = [];
-			for (var iCommand = 0; iCommand < path.commands.length; iCommand++) {
-				var command = path.commands[iCommand];
-				var coords = [];
-				var xScale = glyphs.length*2;//TODO
-				// TODO bounding box etc
-				switch (command.type) {
-					case 'M': coords = [{x: command.x*xScale,  y: command.y}]; break;
-					case 'L': coords = [{x: command.x*xScale,  y: command.y}]; break;
-					case 'C': coords = [{x: command.x1*xScale, y: command.y1}, {x: command.x2*xScale, y: command.y2}, {x: command.x*xScale, y: command.yyScale}]; break;
-					case 'Q': coords = [{x: command.x1*xScale, y: command.y1}, {x: command.x*xScale,  y: command.y}]; break;
+			var paths = [];
+			for (var iCommand = 0; iCommand < glyph.length; iCommand++) {
+				var command = glyph[iCommand];
+				var path = command.type;
+				for (var iCoord = 0; iCoord < command.coords.length; iCoord++) {
+					var c = trapezeMap(p1, p2, p3, p4, command.coords[iCoord]);
+					path += " " + c.x + " " + c.y;
 				}
-				var segment = command.type;
-				for (var iCoord = 0; iCoord < coords.length; iCoord++) {
-					var c = trapezeMap(p1, p2, p3, p4, coords[iCoord]);
-					segment += " " + c.x + " " + c.y;
-				}
-				segments[iCommand] = segment;
+				paths[iCommand] = path;
 			}
-			slot.glyphs[iGlyph] = segments.join(" ");
+			slot.glyphs[iGlyph] = paths.join(" ");
 		}
 	}
     
@@ -1231,7 +1311,7 @@ function updatePiece(element) {
     var piece = computePiece(sn, {
         cropped: $("#cropped").prop('checked'), 
         trapezoidal:$("#trapezoidal").prop('checked'),
-		font: fonts["Impact"], //TODO
+		font: "Impact", //TODO
     });
     
     // Output to SVG.
@@ -1309,7 +1389,7 @@ function downloadSVG(sn) {
     var piece = computePiece(sn, {
         cropped: $("#cropped").prop('checked'), 
         trapezoidal:$("#trapezoidal").prop('checked'),
-		font: fonts["Impact"], //TODO
+		font: "Impact", //TODO
     });
     
     // Output to SVG.
@@ -1360,7 +1440,7 @@ function downloadPDF() {
         {
             cropped: $("#cropped").prop('checked'),
             trapezoidal: $("#trapezoidal").prop('checked'),
-			font: fonts["Impact"], //TODO
+			font: "Impact", //TODO
         },
         {
             orient: $("[name='orient']:checked").val(), 
