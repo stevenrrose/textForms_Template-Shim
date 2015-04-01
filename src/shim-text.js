@@ -1,3 +1,7 @@
+var DEBUG=true;
+
+var DRAW_SHIMS=false;
+
 /*
  *
  * Piece-related algorithms and functions.
@@ -595,15 +599,17 @@ function drawSVG(piece, element) {
     svg.clear();
     for (var iSlot = 0; iSlot < piece.slots.length; iSlot++) {
         var slot = piece.slots[iSlot];
-        // TODO
-        for (var iShim = 0; iShim < slot.shims.length; iShim++) {
-            var shim = slot.shims[iShim];
-            var coords = Array();
-            for (var i = 0; i < shim.length; i++) {
-                coords.push(shim[i].x, shim[i].y);
-            }
-            svg.polygon(coords).attr('class', "shim");
-        }
+		
+		if (DRAW_SHIMS) {
+			for (var iShim = 0; iShim < slot.shims.length; iShim++) {
+				var shim = slot.shims[iShim];
+				var coords = Array();
+				for (var i = 0; i < shim.length; i++) {
+					coords.push(shim[i].x, shim[i].y);
+				}
+				svg.polygon(coords).attr('class', "shim");
+			}
+		}
 		for (var iGlyph = 0; iGlyph < slot.glyphs.length; iGlyph++) {
 			svg.path(slot.glyphs[iGlyph]).attr({fill: 'black', stroke: 'none'});
 		}
@@ -620,39 +626,44 @@ function drawSVG(piece, element) {
  * Draw a piece into a PDF document.
  *
  *  @param piece        The piece data.
- *  @param pdf          jsPDF document.
+ *  @param pdf          The PDFDocument.
  *  @param scale        Scaling factor.
  *  @param offX, offY   Position of top-left corner.
  */
 function drawPDF(piece, pdf, scale, offX, offY) {
     // Line width. Use same for shims and bbox.
-    pdf.setLineWidth(0.05*scale);
+    pdf.lineWidth(0.05);
     
+	pdf.save();
+	
+	pdf.translate(offX, offY);
+	pdf.scale(scale);
+	
     for (var iSlot = 0; iSlot < piece.slots.length; iSlot++) {
         var slot = piece.slots[iSlot];
-        for (var iShim = 0; iShim < slot.shims.length; iShim++) {
-            var shim = slot.shims[iShim];
-            var lines = Array();
-            for (var i = 0; i < shim.length; i++) {
-                lines.push([
-                    shim[(i+1)%shim.length].x-shim[i].x,
-                    shim[(i+1)%shim.length].y-shim[i].y
-                ]);
-            }
-            pdf.lines(
-                lines,
-                shim[0].x*scale+offX, shim[0].y*scale+offY,
-                [scale, scale],
-                'D'
-            );
-            
-        }
+		
+		if (DRAW_SHIMS) {
+			for (var iShim = 0; iShim < slot.shims.length; iShim++) {
+				var shim = slot.shims[iShim];
+				pdf.moveTo(shim[0].x, shim[0].y);
+				for (var i = 1; i <= shim.length; i++) {
+					pdf.lineTo(shim[i%shim.length].x, shim[i%shim.length].y);
+				}
+				pdf.stroke();
+			}
+		}
+		
+		for (var iGlyph = 0; iGlyph < slot.glyphs.length; iGlyph++) {
+			pdf.path(slot.glyphs[iGlyph]).fill();
+		}
     }
+	
     pdf.rect(
-        piece.bbox.x*scale+offX, piece.bbox.y*scale+offY, 
-        (piece.bbox.x2-piece.bbox.x)*scale, (piece.bbox.y2-piece.bbox.y)*scale, 
-        'D'
-    );
+		piece.bbox.x, piece.bbox.y, 
+        (piece.bbox.x2-piece.bbox.x), (piece.bbox.y2-piece.bbox.y)
+    ).stroke();
+	
+	pdf.restore();
 }
 
 /**
@@ -683,18 +694,19 @@ function drawPDF(piece, pdf, scale, offX, offY) {
 function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
     var fontSizePt = 10; /* pt */
     
-    // Create jsPDF object.
-    var pdf = new jsPDF(printOptions.orient, printOptions.unit, printOptions.format);
-    var onePt = 1 / pdf.internal.scaleFactor;
-    pdf.setFontSize(fontSizePt);
-    var fontSizeUnit = fontSizePt * onePt;
+    // Create PDF document.
+    var pdf = new PDFDocument({layout: printOptions.orient, size: printOptions.format});
+    var stream = pdf.pipe(blobStream());
+	
+    pdf.fontSize(fontSizePt);
+    var fontSizeUnit = pdf.currentLineHeight();
     
     // Outer size of the page, i.e. full size minus margins.
     var outerWidth = 
-          pdf.internal.pageSize.width 
+          pdf.page.width
         - (printOptions.margins.left+printOptions.margins.right);   // Horizontal margins.
     var outerHeight =
-          pdf.internal.pageSize.height
+          pdf.page.height
         - (printOptions.margins.top+printOptions.margins.bottom);    // Vertical margins.
         
     // Inner size of the page, i.e. outer size minus header and footer.
@@ -737,23 +749,22 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
     
     // Function for header/footer output.
     var compo = x+"-"+y+"-"+seed;
-    var compoWidth = pdf.getStringUnitWidth(compo) * fontSizeUnit;
+    var compoWidth = pdf.widthOfString(compo);
     var headerFooter = function() {
-        // DEBUG
-        // pdf.rect(
-            // printOptions.margins.left, printOptions.margins.top,
-            // outerWidth, outerHeight,
-            // 'D'
-        // );
-        // pdf.rect(
-            // printOptions.margins.left, printOptions.margins.top + (header ? fontSizeUnit + printOptions.padding : 0),
-            // innerWidth, innerHeight,
-            // 'D'
-        // );
-        
+        if (DEBUG) {
+			pdf.rect(
+				printOptions.margins.left, printOptions.margins.top,
+				outerWidth, outerHeight
+			).stroke();
+			pdf.rect(
+				printOptions.margins.left, printOptions.margins.top + (header ? fontSizeUnit + printOptions.padding : 0),
+				innerWidth, innerHeight
+			).stroke();
+		}
+		
         var compoX, compoY, compoJustif;
         var pageNbX, pageNbY, pageNbJustif;
-        var pagNbWidth = pdf.getStringUnitWidth(page.toString()) * fontSizeUnit;
+        var pagNbWidth = pdf.widthOfString(page.toString());
         
         // Horizontal positions.
         if (printOptions.pageNbPos == printOptions.compoPos && printOptions.compoPos != 'none') {   
@@ -815,24 +826,24 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
         // Output composition number.
         switch (printOptions.compoPos) {
             case 'top':
-                compoY = printOptions.margins.top + fontSizeUnit - onePt;
-                pdf.text(compoX, compoY, compo);
+                compoY = printOptions.margins.top;
+                pdf.text(compo, compoX, compoY, {lineBreak: false});
                 break;
             case 'bottom':
-                compoY = pdf.internal.pageSize.height - printOptions.margins.bottom;
-                pdf.text(compoX, compoY, compo);
+                compoY = pdf.page.height - printOptions.margins.bottom - fontSizeUnit;
+                pdf.text(compo, compoX, compoY, {lineBreak: false});
                 break;
         }
         
         // Output page number.
         switch (printOptions.pageNbPos) {
             case 'top':
-                pageNbY = printOptions.margins.top + fontSizeUnit - onePt;
-                pdf.text(pageNbX, pageNbY, page.toString());
+                pageNbY = printOptions.margins.top;
+                pdf.text(page.toString(), pageNbX, pageNbY, {lineBreak: false});
                 break;
             case 'bottom':
-                pageNbY = pdf.internal.pageSize.height - printOptions.margins.bottom;
-                pdf.text(pageNbX, pageNbY, page.toString());
+                pageNbY = pdf.page.height - printOptions.margins.bottom - fontSizeUnit;
+                pdf.text(page.toString(), pageNbX, pageNbY, {lineBreak: false});
                 break;
         }
     };
@@ -849,8 +860,9 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
                 if ((page % nbPagesPerDoc) == 0) {
                     // Next doc.
                     save();
-                    pdf = new jsPDF(printOptions.orient, printOptions.unit, printOptions.format);
-                    pdf.setFontSize(fontSizePt);
+					pdf = new PDFDocument({layout: printOptions.orient, size: printOptions.format});
+					stream = pdf.pipe(blobStream());
+                    pdf.fontSize(fontSizePt);
                     page++;
                     firstPage = page;
                 } else {
@@ -861,8 +873,8 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
                 // Invert justification on even pages in double-sided mode.
                 if (printOptions.sides == 'double') {
                     switch (printOptions.justif) {
-                        case 'left': printOptions.justif = 'right'; break; 
-                        case 'right': printOptions.justif = 'left'; break; 
+                        case 'left':  printOptions.justif = 'right'; break; 
+                        case 'right': printOptions.justif = 'left';  break; 
                     }
                 }
                 headerFooter();
@@ -873,7 +885,7 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
         var sn = generatePermutation(i, c, x, y)
         var piece = computePiece(sn, pieceOptions);
 
-        var labelWidth = pdf.getStringUnitWidth(sn) * fontSizeUnit;
+        var labelWidth = pdf.widthOfString(sn);
 
         // Offset in gridded layout.
         var offX = printOptions.margins.left + (pieceWidth + printOptions.padding) * col;
@@ -883,31 +895,21 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
         var labelX = offX;
         var shiftRight = innerWidth - (pieceWidth * printOptions.cols) - (printOptions.padding * (printOptions.cols - 1));
 
-        // DEBUG
-        // switch (printOptions.justif) {
-            // case 'left':   pdf.rect(offX, offY, pieceWidth, pieceHeight, 'D'); break;
-            // case 'center': pdf.rect(offX+shiftRight/2, offY, pieceWidth, pieceHeight, 'D'); break;
-            // case 'right':  pdf.rect(offX+shiftRight, offY, pieceWidth, pieceHeight, 'D'); break;
-        // }
-        // switch (printOptions.justif) {
-            // case 'center':
-                // offX += (pieceWidth - (piece.bbox.x2-piece.bbox.x)*scale + shiftRight)/2;
-                // labelX += (pieceWidth - labelWidth + shiftRight)/2;
-                // break;
-                
-            // case 'right':
-                // offX += (pieceWidth - (piece.bbox.x2-piece.bbox.x)*scale + shiftRight);
-                // labelX += (pieceWidth - labelWidth + shiftRight);
-                // break;
-        // }
+        if (DEBUG) {
+			switch (printOptions.justif) {
+				case 'left':   pdf.rect(offX, offY, pieceWidth, pieceHeight).stroke(); break;
+				case 'center': pdf.rect(offX+shiftRight/2, offY, pieceWidth, pieceHeight).stroke(); break;
+				case 'right':  pdf.rect(offX+shiftRight, offY, pieceWidth, pieceHeight).stroke(); break;
+			}
+		}
         
         switch (printOptions.labelPos) {
             case 'top':
-                pdf.text(labelX, offY + fontSizeUnit - onePt*2, sn);
+                pdf.text(sn, labelX, offY, {lineBreak: false});
                 offY += fontSizeUnit;
                 break;
             case 'bottom':
-                pdf.text(labelX, offY + pieceHeight, sn);
+                pdf.text(sn, labelX, offY + pieceHeight - fontSizeUnit, {lineBreak: false});
                 break;
         }
         drawPDF(piece, pdf, scale, offX, offY);
@@ -917,7 +919,11 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
     // Function for periodic saving.
     var save = function() {
         // Save current PDF document.
-        saveAs(new Blob([pdf.output()], {type: 'application/pdf'}), compo+"."+firstPage+"-"+page+".pdf");
+		pdf.end();
+		stream.on('finish', function() {
+			saveAs(stream.toBlob('application/pdf'), compo+"."+firstPage+"-"+page+".pdf");
+		});
+
         onprogress(nb, nbPrint, page, nbPages, doc, nbDocs);
         doc++;
     }
