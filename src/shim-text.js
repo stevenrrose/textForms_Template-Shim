@@ -1,4 +1,4 @@
-var DEBUG=true;
+var DEBUG=false;
 
 var DRAW_SHIMS=false;
 
@@ -558,28 +558,32 @@ function computePiece(sn, options) {
     for (var iSlot = 0; iSlot < slots.length; iSlot++) {
         var slot = slots[iSlot];
 		
-		// Trapeze coordinates.
+		// Output trapeze coordinates (or triangle when both ends are the same).
 		var firstShim = slot.shims[0], lastShim = slot.shims[slot.shims.length-1];
 		var p1 = slot.upward < 0 ? firstShim[0] : firstShim[1], 
 			p2 = slot.upward < 0 ? firstShim[1] : firstShim[0],
 			p3 = slot.upward < 0 ? lastShim[2]  : lastShim[options.trapezoidal ? 3 : 0],
 			p4 = slot.upward < 0 ? lastShim[options.trapezoidal ? 3 : 0] : lastShim[2];
 		
+		// Iterate over number string's glyph paths.
 		var glyphs = numberPaths[options.font][slot.shims.length];
 		slot.glyphs = [];
 		for (var iGlyph = 0; iGlyph < glyphs.length; iGlyph++) {
 			var glyph = glyphs[iGlyph];
-			var paths = [];
+			var segments = [];
+			
+			// Iterate over path commands.
 			for (var iCommand = 0; iCommand < glyph.length; iCommand++) {
 				var command = glyph[iCommand];
-				var path = command.type;
+				
+				// Map segment coordinates to output trapeze.
+				var segment = {type: command.type, coords: []};
 				for (var iCoord = 0; iCoord < command.coords.length; iCoord++) {
-					var c = trapezeMap(p1, p2, p3, p4, command.coords[iCoord]);
-					path += " " + c.x + " " + c.y;
+					segment.coords[iCoord] = trapezeMap(p1, p2, p3, p4, command.coords[iCoord]);
 				}
-				paths[iCommand] = path;
+				segments[iCommand] = segment;
 			}
-			slot.glyphs[iGlyph] = paths.join(" ");
+			slot.glyphs[iGlyph] = segments;
 		}
 	}
     
@@ -610,8 +614,20 @@ function drawSVG(piece, element) {
 				svg.polygon(coords).attr('class', "shim");
 			}
 		}
+		
+		// Build SVG path for each glyph.
 		for (var iGlyph = 0; iGlyph < slot.glyphs.length; iGlyph++) {
-			svg.path(slot.glyphs[iGlyph]).attr({fill: 'black', stroke: 'none'});
+			var glyph = slot.glyphs[iGlyph];
+			var path = "";
+			for (var iSegment = 0; iSegment < glyph.length; iSegment++) {
+				var segment = glyph[iSegment];
+				path += segment.type;
+				for (var iCoord = 0; iCoord < segment.coords.length; iCoord++) {
+					var c = segment.coords[iCoord];
+					path += " " + c.x + " " + c.y;
+				}
+			}
+			svg.path(path).attr({fill: 'black', stroke: 'none'});
 		}
     }
     svg.rect(
@@ -626,44 +642,89 @@ function drawSVG(piece, element) {
  * Draw a piece into a PDF document.
  *
  *  @param piece        The piece data.
- *  @param pdf          The PDFDocument.
+ *  @param pdf          jsPDF document.
  *  @param scale        Scaling factor.
  *  @param offX, offY   Position of top-left corner.
  */
 function drawPDF(piece, pdf, scale, offX, offY) {
     // Line width. Use same for shims and bbox.
-    pdf.lineWidth(0.05);
+    pdf.setLineWidth(0.05*scale);
     
-	pdf.save();
-	
-	pdf.translate(offX, offY);
-	pdf.scale(scale);
-	
     for (var iSlot = 0; iSlot < piece.slots.length; iSlot++) {
         var slot = piece.slots[iSlot];
 		
 		if (DRAW_SHIMS) {
 			for (var iShim = 0; iShim < slot.shims.length; iShim++) {
 				var shim = slot.shims[iShim];
-				pdf.moveTo(shim[0].x, shim[0].y);
-				for (var i = 1; i <= shim.length; i++) {
-					pdf.lineTo(shim[i%shim.length].x, shim[i%shim.length].y);
+	            var lines = Array();
+	            for (var i = 0; i < shim.length; i++) {
+	                lines.push([
+	                    shim[(i+1)%shim.length].x-shim[i].x,
+	                    shim[(i+1)%shim.length].y-shim[i].y
+	                ]);
 				}
-				pdf.stroke();
+	            pdf.lines(
+	                lines,
+	                shim[0].x*scale+offX, shim[0].y*scale+offY,
+	                [scale, scale],
+	                'D'
+	            );
 			}
-		}
-		
+		}	
+
+		// Build PDF path for each glyph.
 		for (var iGlyph = 0; iGlyph < slot.glyphs.length; iGlyph++) {
-			pdf.path(slot.glyphs[iGlyph]).fill();
+			pdf.path(slot.glyphs[iGlyph], offX, offY, [scale, scale], 'F');
 		}
     }
 	
     pdf.rect(
-		piece.bbox.x, piece.bbox.y, 
-        (piece.bbox.x2-piece.bbox.x), (piece.bbox.y2-piece.bbox.y)
-    ).stroke();
+        piece.bbox.x*scale+offX, piece.bbox.y*scale+offY, 
+        (piece.bbox.x2-piece.bbox.x)*scale, (piece.bbox.y2-piece.bbox.y)*scale, 
+        'D'
+    );
+}
+
+/**
+ *  Extends jsPDF with path function.
+ *  
+ *  @param segments		Path segments.
+ *  @param x, y			Offset from origin.
+ *  @param scale		[x, y] scaling factor.
+ * 	@param style		jsPDF style argument.
+ *
+ *  @return this
+ */
+jsPDF.API.path = function(segments, x, y, scale, style) {
+	style = this.internal.getStyle(style);
+	scale = typeof(scale) === 'undefined' ? [1, 1] : scale;
 	
-	pdf.restore();
+	var scalex = scale[0];
+	var scaley = scale[1];
+	
+	var out = this.internal.write;
+	var f3 = function (number) {
+		return number.toFixed(3);
+	};
+	var k = this.internal.scaleFactor;
+	var pageHeight = this.internal.pageSize.height;
+	
+	for (var iSegment = 0; iSegment < segments.length; iSegment++) {
+		var segment = segments[iSegment];
+		for (var iCoord = 0; iCoord < segment.coords.length; iCoord++) {
+			var c = segment.coords[iCoord];
+			out(f3((c.x * scalex + x) * k) + ' ' + f3((pageHeight - (c.y * scaley + y)) * k) + ' ');
+		}
+		switch (segment.type) {
+			case 'M': out('m'); break;
+			case 'L': out('l'); break;
+			case 'C': out('c'); break;
+			case 'Q': out('v'); break;
+			case 'Z': out('h'); break;
+		}
+	}
+	out(style);
+	return this;
 }
 
 /**
@@ -694,19 +755,18 @@ function drawPDF(piece, pdf, scale, offX, offY) {
 function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
     var fontSizePt = 10; /* pt */
     
-    // Create PDF document.
-    var pdf = new PDFDocument({layout: printOptions.orient, size: printOptions.format});
-    var stream = pdf.pipe(blobStream());
+    // Create jsPDF object.
+    var pdf = new jsPDF(printOptions.orient, printOptions.unit, printOptions.format);
+    var onePt = 1 / pdf.internal.scaleFactor;
+    pdf.setFontSize(fontSizePt);
+    var fontSizeUnit = fontSizePt * onePt;
 	
-    pdf.fontSize(fontSizePt);
-    var fontSizeUnit = pdf.currentLineHeight();
-    
     // Outer size of the page, i.e. full size minus margins.
     var outerWidth = 
-          pdf.page.width
+          pdf.internal.pageSize.width 
         - (printOptions.margins.left+printOptions.margins.right);   // Horizontal margins.
     var outerHeight =
-          pdf.page.height
+          pdf.internal.pageSize.height
         - (printOptions.margins.top+printOptions.margins.bottom);    // Vertical margins.
         
     // Inner size of the page, i.e. outer size minus header and footer.
@@ -749,22 +809,24 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
     
     // Function for header/footer output.
     var compo = x+"-"+y+"-"+seed;
-    var compoWidth = pdf.widthOfString(compo);
+    var compoWidth = pdf.getStringUnitWidth(compo) * fontSizeUnit;
     var headerFooter = function() {
         if (DEBUG) {
 			pdf.rect(
 				printOptions.margins.left, printOptions.margins.top,
-				outerWidth, outerHeight
-			).stroke();
+				outerWidth, outerHeight,
+				'D'
+			);
 			pdf.rect(
 				printOptions.margins.left, printOptions.margins.top + (header ? fontSizeUnit + printOptions.padding : 0),
-				innerWidth, innerHeight
-			).stroke();
+				innerWidth, innerHeight,
+				'D'
+			);
 		}
 		
         var compoX, compoY, compoJustif;
         var pageNbX, pageNbY, pageNbJustif;
-        var pagNbWidth = pdf.widthOfString(page.toString());
+        var pagNbWidth = pdf.getStringUnitWidth(page.toString()) * fontSizeUnit;
         
         // Horizontal positions.
         if (printOptions.pageNbPos == printOptions.compoPos && printOptions.compoPos != 'none') {   
@@ -826,24 +888,24 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
         // Output composition number.
         switch (printOptions.compoPos) {
             case 'top':
-                compoY = printOptions.margins.top;
-                pdf.text(compo, compoX, compoY, {lineBreak: false});
+                compoY = printOptions.margins.top + fontSizeUnit - onePt;
+                pdf.text(compoX, compoY, compo);
                 break;
             case 'bottom':
-                compoY = pdf.page.height - printOptions.margins.bottom - fontSizeUnit;
-                pdf.text(compo, compoX, compoY, {lineBreak: false});
+                compoY = pdf.internal.pageSize.height - printOptions.margins.bottom;
+                pdf.text(compoX, compoY, compo);
                 break;
         }
         
         // Output page number.
         switch (printOptions.pageNbPos) {
             case 'top':
-                pageNbY = printOptions.margins.top;
-                pdf.text(page.toString(), pageNbX, pageNbY, {lineBreak: false});
+                pageNbY = printOptions.margins.top + fontSizeUnit - onePt;
+                pdf.text(pageNbX, pageNbY, page.toString());
                 break;
             case 'bottom':
-                pageNbY = pdf.page.height - printOptions.margins.bottom - fontSizeUnit;
-                pdf.text(page.toString(), pageNbX, pageNbY, {lineBreak: false});
+                pageNbY = pdf.internal.pageSize.height - printOptions.margins.bottom;
+                pdf.text(pageNbX, pageNbY, page.toString());
                 break;
         }
     };
@@ -860,9 +922,8 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
                 if ((page % nbPagesPerDoc) == 0) {
                     // Next doc.
                     save();
-					pdf = new PDFDocument({layout: printOptions.orient, size: printOptions.format});
-					stream = pdf.pipe(blobStream());
-                    pdf.fontSize(fontSizePt);
+                    pdf = new jsPDF(printOptions.orient, printOptions.unit, printOptions.format);
+                    pdf.setFontSize(fontSizePt);
                     page++;
                     firstPage = page;
                 } else {
@@ -885,7 +946,7 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
         var sn = generatePermutation(i, c, x, y)
         var piece = computePiece(sn, pieceOptions);
 
-        var labelWidth = pdf.widthOfString(sn);
+        var labelWidth = pdf.getStringUnitWidth(sn) * fontSizeUnit;
 
         // Offset in gridded layout.
         var offX = printOptions.margins.left + (pieceWidth + printOptions.padding) * col;
@@ -897,19 +958,19 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
 
         if (DEBUG) {
 			switch (printOptions.justif) {
-				case 'left':   pdf.rect(offX, offY, pieceWidth, pieceHeight).stroke(); break;
-				case 'center': pdf.rect(offX+shiftRight/2, offY, pieceWidth, pieceHeight).stroke(); break;
-				case 'right':  pdf.rect(offX+shiftRight, offY, pieceWidth, pieceHeight).stroke(); break;
+				case 'left':   pdf.rect(offX, offY, pieceWidth, pieceHeight, 'D'); break;
+				case 'center': pdf.rect(offX+shiftRight/2, offY, pieceWidth, pieceHeight, 'D'); break;
+				case 'right':  pdf.rect(offX+shiftRight, offY, pieceWidth, pieceHeight, 'D'); break;
 			}
 		}
         
         switch (printOptions.labelPos) {
             case 'top':
-                pdf.text(sn, labelX, offY, {lineBreak: false});
+                pdf.text(labelX, offY + fontSizeUnit - onePt*2, sn);
                 offY += fontSizeUnit;
                 break;
             case 'bottom':
-                pdf.text(sn, labelX, offY + pieceHeight - fontSizeUnit, {lineBreak: false});
+                pdf.text(labelX, offY + pieceHeight, sn);
                 break;
         }
         drawPDF(piece, pdf, scale, offX, offY);
@@ -919,11 +980,7 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
     // Function for periodic saving.
     var save = function() {
         // Save current PDF document.
-		pdf.end();
-		stream.on('finish', function() {
-			saveAs(stream.toBlob('application/pdf'), compo+"."+firstPage+"-"+page+".pdf");
-		});
-
+        saveAs(new Blob([pdf.output()], {type: 'application/pdf'}), compo+"."+firstPage+"-"+page+".pdf");
         onprogress(nb, nbPrint, page, nbPages, doc, nbDocs);
         doc++;
     }
