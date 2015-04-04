@@ -326,25 +326,31 @@ function project(c, p, y) {
 }
 
 /**
- *  Interpolate point between *p1* and *p2* at unit position *p*.
+ * 	Interpolate between *p1* and *p2* at relative position *d*.
+ *
+ *  @param p1   First point (d=0).
+ *  @param p2   Second point (d=1).
+ *  @param d    Position.
  *  
- *  *p* = 0 -> *p1*
- *  *p* = 1 -> *p2*
+ *  @return interpolated point.
  */
-function interpolate(p1, p2, p) {
-	return {
-		x: (p1.x + p * (p2.x-p1.x)),
-		y: (p1.y + p * (p2.y-p1.y))
-	};
+function interpolate(p1, p2, d) {
+    return {
+        x: p1.x + (p2.x-p1.x)*d,
+        y: p1.y + (p2.y-p1.y)*d
+    };
 }
 
 /**
  *  Map point *p* in unit coordinates into trapeze defined by points *p1*-*p2*-*p3*-*p4*.
  *  
- *  *p* = (0,0) -> *p1*
- *  *p* = (0,1) -> *p2*
- *  *p* = (1,1) -> *p3*
- *  *p* = (1,0) -> *p4*
+ *  @param p1	Top-left (0,0).
+ *  @param p2	Bottom-left (0,1).
+ *  @param p3	Bottom-right (1,1).
+ *  @param p4	Top-right (1,0).
+ *  @param p	Source point.
+ *  
+ *  @return interpolated point.
  */
 function trapezeMap(p1, p2, p3, p4, p) {
 	// First compute linear interpolations of p.x along (p1,p4) and (p2,p3).
