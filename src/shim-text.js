@@ -365,7 +365,7 @@ function trapezeMap(p1, p2, p3, p4, p) {
  * Compute a piece from its serial number.
  *
  *  @param sn           The piece serial number.
- *  @param options      Piece options: cropped, trapezoidal, font.
+ *  @param options      Piece options: cropped, trapezoidal, alternate, font.
  *
  *  @return The piece object.
  */
@@ -566,10 +566,18 @@ function computePiece(sn, options) {
 		
 		// Output trapeze coordinates (or triangle when both ends are the same).
 		var firstShim = slot.shims[0], lastShim = slot.shims[slot.shims.length-1];
-		var p1 = slot.upward < 0 ? firstShim[0] : firstShim[1], 
-			p2 = slot.upward < 0 ? firstShim[1] : firstShim[0],
-			p3 = slot.upward < 0 ? lastShim[2]  : lastShim[options.trapezoidal ? 3 : 0],
-			p4 = slot.upward < 0 ? lastShim[options.trapezoidal ? 3 : 0] : lastShim[2];
+		var p1, p2, p3, p4;
+		if (slot.upward > 0 && !options.alternate) {
+			p1 = firstShim[1];
+			p2 = firstShim[0];
+			p3 = lastShim[options.trapezoidal ? 3 : 0];
+			p4 = lastShim[2];
+		} else {
+			p1 = firstShim[0];
+			p2 = firstShim[1];
+			p3 = lastShim[2];
+			p4 = lastShim[options.trapezoidal ? 3 : 0];
+		}
 		
 		// Iterate over number string's glyph paths.
 		var glyphs = numberPaths[options.font][slot.shims.length];
@@ -737,7 +745,7 @@ jsPDF.API.path = function(segments, x, y, scale, style) {
  * Generate a multi-page PDF from a set of pieces.
  *
  *
- *  @param pieceOptions     Piece options: cropped, trapezoidal, font.
+ *  @param pieceOptions     Piece options: cropped, trapezoidal, alternate, font.
  *  @param printOptions     Print options:
  *                          - orient    Orientation ('portrait', 'landscape').
  *                          - format    Page format ('a3', 'a4','a5' ,'letter' ,'legal').
@@ -1040,7 +1048,7 @@ function piecesToPDF(pieceOptions, printOptions, limits, onprogress, onfinish) {
 /**
  * Generate a Zip archive of SVG files from a set of pieces.
  *
- *  @param pieceOptions     Piece options: cropped, trapezoidal.
+ *  @param pieceOptions     Piece options: cropped, trapezoidal, alternate, font.
  *  @param limits           Output limits:
  *                          - maxPieces        Maximum overall number of pieces to export.
  *                          - maxPiecesPerZip  Maximum number of pieces per Zip file.
@@ -1407,6 +1415,7 @@ function updatePiece(element) {
     var piece = computePiece(sn, {
         cropped: 	 $("#cropped").prop('checked'), 
         trapezoidal: $("#trapezoidal").prop('checked'),
+        alternate: 	 $("#alternate").prop('checked'),
 		font: 		 $("#font").val(),
     });
     
@@ -1485,6 +1494,7 @@ function downloadSVG(sn) {
     var piece = computePiece(sn, {
         cropped:	 $("#cropped").prop('checked'), 
         trapezoidal: $("#trapezoidal").prop('checked'),
+        alternate: 	 $("#alternate").prop('checked'),
 		font: 		 $("#font").val(),
     });
     
@@ -1536,6 +1546,7 @@ function downloadPDF() {
         {
             cropped: 	 $("#cropped").prop('checked'),
             trapezoidal: $("#trapezoidal").prop('checked'),
+			alternate: 	 $("#alternate").prop('checked'),
 			font:		 $("#font").val(),
         },
         {
@@ -1580,7 +1591,9 @@ function downloadZip() {
     piecesToZip(
         {
             cropped: $("#cropped").prop('checked'),
-            trapezoidal: $("#trapezoidal").prop('checked')
+            trapezoidal: $("#trapezoidal").prop('checked'),
+			alternate: 	 $("#alternate").prop('checked'),
+			font: 		 $("#font").val(),
         },
         {
             maxPieces: parseInt($("#maxZip").val()),
