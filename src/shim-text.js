@@ -567,11 +567,18 @@ function computePiece(sn, options) {
 		// Output trapeze coordinates (or triangle when both ends are the same).
 		var firstShim = slot.shims[0], lastShim = slot.shims[slot.shims.length-1];
 		var p1, p2, p3, p4;
-		if (slot.upward > 0 && !options.alternate) {
-			p1 = firstShim[1];
-			p2 = firstShim[0];
-			p3 = lastShim[options.trapezoidal ? 3 : 0];
-			p4 = lastShim[2];
+		if (slot.upward > 0) {
+			if (options.alternate) {
+				p1 = lastShim[options.trapezoidal ? 3 : 0];
+				p2 = lastShim[2];
+				p3 = firstShim[1];
+				p4 = firstShim[0];
+			} else {
+				p1 = firstShim[1];
+				p2 = firstShim[0];
+				p3 = lastShim[options.trapezoidal ? 3 : 0];
+				p4 = lastShim[2];
+			}
 		} else {
 			p1 = firstShim[0];
 			p2 = firstShim[1];
