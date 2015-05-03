@@ -141,8 +141,8 @@
                 <label for="cropped" id="cropped-label" class="btn btn-default" data-toggle="button" data-cropped-text="Cropped">Uncropped</label>
                 <input type="checkbox" id="trapezoidal" class="hidden" onchange="updatePieces()"/>
                 <label for="trapezoidal" id="trapezoidal-label" class="btn btn-default" data-toggle="button" data-trapezoidal-text="4-sided">3-sided</label>
-                <input type="checkbox" id="alternate" class="hidden" onchange="updatePieces()"/>
-                <label for="alternate" id="alternate-label" class="btn btn-default" data-toggle="button" data-alternate-text="Alternate">Top-down</label>
+                <input type="checkbox" id="alternate" class="hidden" onchange="updatePieces()" checked />
+                <label for="alternate" id="alternate-label" class="btn btn-default active" data-toggle="button" aria-pressed="true" data-alternate-text="Alternate" data-topdown-text="Top-down">Alternate</label>
 				<div class="input-group input-group-sm">
 					<span></span>
 					<select id="font" class="form-control" onchange="updatePieces()"/></select>
@@ -165,7 +165,7 @@
                 $("#alternate").click();
             });
             $("#alternate").change(function() {
-                $("#alternate-label").button(this.checked?"alternate":'reset');
+                $("#alternate-label").button(this.checked?"alternate":"topdown");
             });
             </script>
             <div id="pager" class="btn-group"></div>
