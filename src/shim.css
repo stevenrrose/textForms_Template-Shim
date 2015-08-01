@@ -3,46 +3,39 @@
     stroke: black; 
     stroke-width: 0.1;
 }
+#pieces {
+	margin-left: 8px;
+	margin-right: 8px;
+}
+.piece {
+	padding: 4px;
+	margin: 0;
+}
 .piece .thumbnail {
+	border-top: none;
     text-align: center;
+	padding: 0;
 }
-.piece .piece-select {
-    position: absolute;
-    margin: 10px;
+.piece .thumbnail > label {
+	width: 100%;
+	margin: 0;
 }
-.piece .piece-select + label {
-    width: 100%;
-    background-color: #e0e0e0;
-    _background-image: linear-gradient(to bottom,#e0e0e0 0,#b0b0b0 100%);
-    opacity: 0.5;
+.piece {
+    opacity: 0.25;
 }
-.piece .piece-select:checked + label {
-    background-color: #fff;
-    _background-image: inherit;
+.piece.selected {
     opacity: 1.0;
 }
-.piece  svg {
-    height: 256px;
-    margin-top: 10px;
+.piece svg {
+    max-height: 500px;
+	margin: 16px 16px 12px 16px;
 }
 #pdf {
     width: 100%;
     height: 100%;
     border: 1px solid black;
 }
-#cropped-label, #trapezoidal-label {
-    font-style: italic;
-}
-#pager .pagination {
-    margin: 0;
-}
-#toolbar .btn-group {
-    margin-bottom: 10px;
-}
-#counter {
-    font-size: smaller;
-    font-style:italic;
-}
+
 legend {
     font-size: larger;
     font-weight: bold;
@@ -53,4 +46,37 @@ legend {
 .progress-bar {
     -webkit-transition: none;
     transition: none;
+}
+
+/* Bootstrap CSS ajustment for toolbar. */
+#toolbar {
+  border-color: black;
+  border-left: none;
+  border-right: none;
+  margin-left: 12px;
+  margin-right: 12px;
+  padding: 14px 0;
+}
+#toolbar .control-label {
+    padding-top: 8px;
+}
+
+/* Times sign separator between #columns/#rows. */
+@media (min-width: 768px) {
+	#display1 {
+		padding-right: 16px;
+		position: relative;
+	}
+	#display1:after {
+		display: block;
+		position: absolute;
+		width: 2em;
+		right: -1em;
+		top: 40px;
+		content: "\2716";
+		text-align: center;
+	}
+	#display2 {
+		padding-left: 16px;
+	}
 }

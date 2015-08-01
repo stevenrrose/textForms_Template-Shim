@@ -1328,45 +1328,60 @@ function displayPieces(page) {
     var $pager = $("#pager");
     $pager.empty();
     if (nbPages > 1) {
-        var pager = "<ul class='pagination pagination-sm'>";
-        pager += "<li" + (page==0?" class='disabled'":"") + "><a href='javascript:displayPieces(" + Math.max(0,page-1) + ")'>&laquo;</a></li>";
+		// Standard pager.
+		$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + Math.max(0,page-1) + ")'><span class='icon icon-arrow-left'></span><span class='sr-only'> Prev</span></button>")
+			.prop('disabled', page==0)
+			.appendTo($pager);
         for (var i = 0; i < nbPages; i++) {
             if (nbPages > 10) {
                 // Limit buttons to 10, add ellipses for missing buttons.
                 if (page < 5) {
                     if (i == 8) {
                         // Ellipsis at end.
-                        pager += "<li class='disabled'><span>...</span></li>";
+                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+							.appendTo($pager);
                         i = nbPages-2;
                         continue;
                     }
                 } else if (page >= nbPages-5) {
                     if (i == 1) {
                         // Ellipsis at beginning.
-                        pager += "<li class='disabled'><span>...</span></li>";
+                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+							.appendTo($pager);
                         i = nbPages-9;
                         continue;
                     }
                 } else {
                     if (i == 1) {
                         // Ellipsis at beginning.
-                        pager += "<li class='disabled'><span>...</span></li>";
+                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+							.appendTo($pager);
                         i = page-3;
                         continue;
                     } else if (i == page+3) {
                         // Ellipsis at end.
-                        pager += "<li class='disabled'><span>...</span></li>";
+                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+							.appendTo($pager);
                         i = nbPages-2;
                         continue;
                     }
                 }
             }
-            pager += "<li" + (i==page?" class='active'":"") + "><a href='javascript:displayPieces(" + i + ")'>" + (i+1) + "</a></li>";
+			$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + i + ")'>" + (i+1) + "</button>")
+				.toggleClass('active', page==i)
+				.appendTo($pager);
         }
-        pager += "<li" + (page==nbPages-1?" class='disabled'":"") + "><a href='javascript:displayPieces(" + Math.min(page+1,nbPages-1) + ")'>&raquo;</a></li>";
-        pager += "</ul>";
-        $pager.append(pager);
-    }    
+		$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + Math.min(page+1,nbPages-1) + ")'><span class='icon icon-arrow-right'></span><span class='sr-only'> Next</span></button>")
+			.prop('disabled', page==nbPages-1)
+			.appendTo($pager);
+		$pager.find("button").wrap("<div class='form-group col-sm-1'></div>");
+		
+		// Small pager for XS devices.
+		$("#prevPage").prop('disabled', page==0).attr('onclick', "displayPieces(" + Math.max(0,page-1) + ")");
+		$("#nextPage").prop('disabled', page==nbPages-1).attr('onclick', "displayPieces(" + Math.min(page+1,nbPages-1) + ")");
+		$("#currentPage").html(page+1);
+		$("#totalPages").html(nbPages);
+    }
     
     // Clear existing pieces.
     var $pieces = $("#pieces");
@@ -1380,16 +1395,16 @@ function displayPieces(page) {
         var selected = defaultSelected;
         if (pieceToggle[i]) selected = !selected;
         
-        var piece = "<div id='piece-" + i + "' class='form-inline piece " + colClass + "'>";
-        piece += "<div class='thumbnail'>";
-        piece += "<input id='piece-select-" + i + "' class='piece-select' data-piece='" + i + "' type='checkbox' onclick='togglePiece(" + i + ")' " + (selected?" checked":"") + "/> ";
-        piece += "<label for='piece-select-" + i + "'>";
-        piece += "<svg xmlns='http://www.w3.org/2000/svg' version='1.1'></svg><br/>";
-        piece += "</label>";
-        piece += "<div class='input-group input-group-sm'>";
+        var piece = "<div id='piece-" + i + "' class='form-inline piece " + (selected?"selected ":"") + colClass + "'>";
+        piece += "<div class='input-group'>";
+        piece += "<label class='input-group-addon'><input id='piece-select-" + i + "' class='piece-select' data-piece='" + i + "' type='checkbox' onclick='togglePiece(" + i + ")' " + (selected?" checked":"") + "/><span></span></label>";
         piece += "<input type='text' class='form-control sn' readonly placeholder='Piece S/N' value='" + generatePermutation(i, c, x, y) + "' size='" + y + "'/>";
-        piece += "<span class='input-group-btn'><button type='button' class='btn btn-default' onclick='downloadSVG($(this).parent().parent().find(\".sn\").val().trim())'><span class='glyphicon glyphicon-download'></span> SVG</button></span>"
+        piece += "<span class='input-group-addon input-group-btn'><button type='button' class='btn btn-primary' onclick='downloadSVG($(this).parent().parent().find(\".sn\").val().trim())'>SVG <span class='icon icon-arrow-down'></span></button></span>"
         piece += "</div>";
+        piece += "<div class='thumbnail'>";
+        piece += "<label for='piece-select-" + i + "'>";
+        piece += "<svg xmlns='http://www.w3.org/2000/svg' version='1.1'></svg>";
+        piece += "</label>";
         piece += "</div>";
         piece += "</div>";
         $pieces.append(piece);
@@ -1420,9 +1435,9 @@ function updatePiece(element) {
     
     // Generate piece.
     var piece = computePiece(sn, {
-        cropped: 	 $("#cropped").prop('checked'), 
-        trapezoidal: $("#trapezoidal").prop('checked'),
-        alternate: 	 $("#alternate").prop('checked'),
+        cropped: 	 $("#cropped").prop('selected'), 
+        trapezoidal: $("#trapezoidal").prop('selected'),
+        alternate: 	 $("#alternate").prop('selected'),
 		font: 		 $("#font").val(),
     });
     
@@ -1450,8 +1465,8 @@ function togglePiece(piece) {
         pieceToggle[piece] = true;
         nbToggle++;
     }
+	$("#piece-"+piece).toggleClass("selected");
     updateSelected();
-    
 }
 
 /**
@@ -1485,8 +1500,8 @@ function checkAll(check) {
  */
 function updateSelected() {
     nbSelected = (defaultSelected ? nbPieces - nbToggle : nbToggle);
-    $("#totalPieces").html(nbPieces);
-    $("#selectedPieces").html(nbSelected);
+    $("#totalPieces").html(nbPieces + " " + (nbPieces > 1 ? "SHIMS" : "SHIM") + " TOTAL");
+    $("#selectedPieces").html(nbSelected + " " + (nbSelected > 1 ? "SHIMS" : "SHIM") + " SELECTED");
     $("#zip").prop('disabled', (nbSelected == 0));
     $("#print").prop('disabled', (nbSelected == 0));
 }
@@ -1499,9 +1514,9 @@ function updateSelected() {
 function downloadSVG(sn) {
     // Generate piece.
     var piece = computePiece(sn, {
-        cropped:	 $("#cropped").prop('checked'), 
-        trapezoidal: $("#trapezoidal").prop('checked'),
-        alternate: 	 $("#alternate").prop('checked'),
+        cropped:	 $("#cropped").prop('selected'), 
+        trapezoidal: $("#trapezoidal").prop('selected'),
+        alternate: 	 $("#alternate").prop('selected'),
 		font: 		 $("#font").val(),
     });
     
@@ -1551,9 +1566,9 @@ function downloadPDF() {
     $("#progressDialog").modal('show');
     piecesToPDF(
         {
-            cropped: 	 $("#cropped").prop('checked'),
-            trapezoidal: $("#trapezoidal").prop('checked'),
-			alternate: 	 $("#alternate").prop('checked'),
+            cropped: 	 $("#cropped").prop('selected'),
+            trapezoidal: $("#trapezoidal").prop('selected'),
+			alternate: 	 $("#alternate").prop('selected'),
 			font:		 $("#font").val(),
         },
         {
@@ -1597,9 +1612,9 @@ function downloadZip() {
     $("#progressDialog").modal('show');
     piecesToZip(
         {
-            cropped: $("#cropped").prop('checked'),
-            trapezoidal: $("#trapezoidal").prop('checked'),
-			alternate: 	 $("#alternate").prop('checked'),
+            cropped: $("#cropped").prop('selected'),
+            trapezoidal: $("#trapezoidal").prop('selected'),
+			alternate: 	 $("#alternate").prop('selected'),
 			font: 		 $("#font").val(),
         },
         {
