@@ -68,13 +68,12 @@
 							<label for="nbPieces" class="control-label">Pieces</label>
 							<div class="input-group">
 								<input type="number" class="form-control" id="nbPieces" value="1" min="1" max="1000" />
+								<input type="hidden" id="oldNbPieces" />
 								<label class="input-group-addon"><input type="checkbox" id="max" /><span> Max</span></label>
 							</div>
 							<p class="help-block">No. of Pieces to Generate.</p>
 							<script>
-							$("#max").change(function() {
-								$("#nbPieces").prop('disabled', this.checked);
-							});
+							$("#max").change(validatePermutationSize);
 							</script>
 						</div>
 
@@ -148,16 +147,16 @@
 			<div class="row">
 				<!-- Selection -->
 				<div class="form-group col-sm-3">
-					<button type="button" class="btn btn-default form-control" onclick="checkVisible(true)"><span class="icon icon-checkbox-on"></span> Check visible</button>
+					<button type="button" class="btn btn-default form-control" onclick="checkVisible(true)"><span class="icon icon-checkbox-group-on"></span> Check visible</button>
 				</div>
 				<div class="form-group col-sm-3">
-					<button type="button" class="btn btn-default form-control" onclick="checkVisible(false)"><span class="icon icon-checkbox-off"></span> Clear visible</button>
+					<button type="button" class="btn btn-default form-control" onclick="checkVisible(false)"><span class="icon icon-checkbox-group-off"></span> Clear visible</button>
 				</div>
 				<div class="form-group col-sm-3">
-					<button type="button" class="btn btn-default form-control" onclick="checkAll(true)"><span class="icon icon-checkbox-on"></span> Check all</button>
+					<button type="button" class="btn btn-default form-control" onclick="checkAll(true)"><span class="icon icon-checkbox-group-on"></span> Check all</button>
 				</div>
 				<div class="form-group col-sm-3">
-					<button type="button" class="btn btn-default form-control" onclick="checkAll(false)"><span class="icon icon-checkbox-off"></span> Clear all</button>
+					<button type="button" class="btn btn-default form-control" onclick="checkAll(false)"><span class="icon icon-checkbox-group-off"></span> Clear all</button>
 				</div>
 
 				<!-- Counters -->
@@ -560,6 +559,9 @@
 		$("input[type='number']").wrap("<div class='styled-input'></div>").after("<span class='input-spinbox-up'></span><span class='input-spinbox-down'></span>");
 		$(".input-spinbox-up")  .click(function(e) {e.stopPropagation(); var i = $(this).parent().find("input"); i[0].stepUp(); i.change();});
 		$(".input-spinbox-down").click(function(e) {e.stopPropagation(); var i = $(this).parent().find("input"); i[0].stepDown(); i.change();});
+		
+		// Validate auto-filled field values.
+		validatePermutationSize();
     </script>
 </body>
 </html>
