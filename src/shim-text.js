@@ -1175,6 +1175,10 @@ var colClass;
 
 /** Paging. */
 var nbPages, nbPerPage;
+var currentPage;
+
+/** Infinite scroll. */
+var infiniteScroll = true;
 
 /** Default selection state. */
 var defaultSelected;
@@ -1334,72 +1338,77 @@ function generatePieces() {
 function displayPieces(page) {
     // Sanity check.
     page = Math.max(0, Math.min(page, nbPages-1));
+	currentPage = page;
     
     // Display toolbar.
     $("#toolbar").removeClass("hidden");
     
-    // Display pager.
-    var $pager = $("#pager");
-    $pager.empty();
-    if (nbPages > 1) {
-		// Standard pager.
-		$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + Math.max(0,page-1) + ")'><span class='icon icon-arrow-left'></span><span class='sr-only'> Prev</span></button>")
-			.prop('disabled', page==0)
-			.appendTo($pager);
-        for (var i = 0; i < nbPages; i++) {
-            if (nbPages > 10) {
-                // Limit buttons to 10, add ellipses for missing buttons.
-                if (page < 5) {
-                    if (i == 8) {
-                        // Ellipsis at end.
-                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
-							.appendTo($pager);
-                        i = nbPages-2;
-                        continue;
-                    }
-                } else if (page >= nbPages-5) {
-                    if (i == 1) {
-                        // Ellipsis at beginning.
-                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
-							.appendTo($pager);
-                        i = nbPages-9;
-                        continue;
-                    }
-                } else {
-                    if (i == 1) {
-                        // Ellipsis at beginning.
-                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
-							.appendTo($pager);
-                        i = page-3;
-                        continue;
-                    } else if (i == page+3) {
-                        // Ellipsis at end.
-                        $("<button type='button' class='btn btn-default form-control' disabled>...</button>")
-							.appendTo($pager);
-                        i = nbPages-2;
-                        continue;
-                    }
-                }
-            }
-			$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + i + ")'>" + (i+1) + "</button>")
-				.toggleClass('active', page==i)
+	if (!infiniteScroll) {
+		// Display pager in paged mode.
+		var $pager = $("#pager");
+		$pager.empty();
+		if (nbPages > 1) {
+			// Standard pager.
+			$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + Math.max(0,page-1) + ")'><span class='icon icon-arrow-left'></span><span class='sr-only'> Prev</span></button>")
+				.prop('disabled', page==0)
 				.appendTo($pager);
-        }
-		$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + Math.min(page+1,nbPages-1) + ")'><span class='icon icon-arrow-right'></span><span class='sr-only'> Next</span></button>")
-			.prop('disabled', page==nbPages-1)
-			.appendTo($pager);
-		$pager.find("button").wrap("<div class='form-group col-sm-1'></div>");
-		
-		// Small pager for XS devices.
-		$("#prevPage").prop('disabled', page==0).attr('onclick', "displayPieces(" + Math.max(0,page-1) + ")");
-		$("#nextPage").prop('disabled', page==nbPages-1).attr('onclick', "displayPieces(" + Math.min(page+1,nbPages-1) + ")");
-		$("#currentPage").html(page+1);
-		$("#totalPages").html(nbPages);
-    }
+			for (var i = 0; i < nbPages; i++) {
+				if (nbPages > 10) {
+					// Limit buttons to 10, add ellipses for missing buttons.
+					if (page < 5) {
+						if (i == 8) {
+							// Ellipsis at end.
+							$("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+								.appendTo($pager);
+							i = nbPages-2;
+							continue;
+						}
+					} else if (page >= nbPages-5) {
+						if (i == 1) {
+							// Ellipsis at beginning.
+							$("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+								.appendTo($pager);
+							i = nbPages-9;
+							continue;
+						}
+					} else {
+						if (i == 1) {
+							// Ellipsis at beginning.
+							$("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+								.appendTo($pager);
+							i = page-3;
+							continue;
+						} else if (i == page+3) {
+							// Ellipsis at end.
+							$("<button type='button' class='btn btn-default form-control' disabled>...</button>")
+								.appendTo($pager);
+							i = nbPages-2;
+							continue;
+						}
+					}
+				}
+				$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + i + ")'>" + (i+1) + "</button>")
+					.toggleClass('active', page==i)
+					.appendTo($pager);
+			}
+			$("<button type='button' class='btn btn-default form-control' onclick='displayPieces(" + Math.min(page+1,nbPages-1) + ")'><span class='icon icon-arrow-right'></span><span class='sr-only'> Next</span></button>")
+				.prop('disabled', page==nbPages-1)
+				.appendTo($pager);
+			$pager.find("button").wrap("<div class='form-group col-sm-1'></div>");
+			
+			// Small pager for XS devices.
+			$("#prevPage").prop('disabled', page==0).attr('onclick', "displayPieces(" + Math.max(0,page-1) + ")");
+			$("#nextPage").prop('disabled', page==nbPages-1).attr('onclick', "displayPieces(" + Math.min(page+1,nbPages-1) + ")");
+			$("#currentPage").html(page+1);
+			$("#totalPages").html(nbPages);
+		}
+		}
     
-    // Clear existing pieces.
     var $pieces = $("#pieces");
-    $pieces.empty();
+    if (!infiniteScroll || page == 0) {
+		// Clear existing pieces in paged mode.
+		$pieces.empty();
+	}
     
     // Generate piece output elements.
     var begin = nbPerPage*page;
@@ -1428,6 +1437,36 @@ function displayPieces(page) {
     $pieces.find(".piece").each(function(index, element) {
         updatePiece(element);
     });
+	
+    if (infiniteScroll) {
+		// Spinning icon at the end of the page.
+		if (page == nbPages-1) {
+			// Last page, remove icon.
+			$("#pieces-end").remove();
+		} else if (page == 0) {
+			// Add icon; triggers appendPage() when visible.
+			$pieces.append("<div id='pieces-end' class='col-xs-12'><span class='icon icon-generate rotate-ccw'></span><span class='sr-only'>Generating...</span></div>");
+			$(window).on('resize scroll', appendPage);
+		} else {
+			// Move icon to end of viewport.
+			$("#pieces-end").appendTo($pieces);
+		}
+	}
+    
+}
+
+/**
+ * Append a new page to the already visible pieces. Used in infinite scroll mode.
+ */
+function appendPage() {
+	if (currentPage+1 >= nbPages) return;
+	
+	var end = $("#pieces-end")[0];
+	var rect = end.getBoundingClientRect();
+	if (rect.top < $(window).height()) {
+		// Spinning icon is visible, append next page.
+		displayPieces(currentPage+1);
+	}
 }
 
 /**
@@ -1514,8 +1553,8 @@ function checkAll(check) {
  */
 function updateSelected() {
     nbSelected = (defaultSelected ? nbPieces - nbToggle : nbToggle);
-    $("#totalPieces").html(nbPieces + " " + (nbPieces > 1 ? "SHIMS" : "SHIM") + " TOTAL");
-    $("#selectedPieces").html(nbSelected + " " + (nbSelected > 1 ? "SHIMS" : "SHIM") + " SELECTED");
+    $("#totalPieces").html(nbPieces + " " + (nbPieces > 1 ? "IMAGES" : "IMAGE"));
+    $("#selectedPieces").html(nbSelected + " SELECTED");
     $("#zip").prop('disabled', (nbSelected == 0));
     $("#print").prop('disabled', (nbSelected == 0));
 }
@@ -1639,3 +1678,26 @@ function downloadZip() {
         function() {$("#progressDialog").modal('hide');}
     );
 }
+
+
+/*
+ *
+ * Initialization.
+ *
+ */
+
+(function($){
+	$(document).ready(function() {
+        // Add validation for number inputs.
+        $("input[type='number']").change(validateNumber);
+		
+		// Styling.
+		$("select").wrap("<div class='styled-select'></div>");
+		$("input[type='number']").wrap("<div class='styled-input'></div>").after("<span class='input-spinbox-up'></span><span class='input-spinbox-down'></span>");
+		$(".input-spinbox-up")  .click(function(e) {e.stopPropagation(); var i = $(this).parent().find("input"); i[0].stepUp(); i.change();});
+		$(".input-spinbox-down").click(function(e) {e.stopPropagation(); var i = $(this).parent().find("input"); i[0].stepDown(); i.change();});
+		
+		// Validate auto-filled field values.
+		validatePermutationSize();
+	});
+}(jQuery));

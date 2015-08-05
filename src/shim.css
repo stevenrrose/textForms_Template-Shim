@@ -61,22 +61,58 @@ legend {
     padding-top: 8px;
 }
 
-/* Times sign separator between #columns/#rows. */
+/* Times sign separator between print layout columns/rows. */
+#layout1:after {
+	display: block;
+	content: "\2716";
+	text-align: center;
+}
 @media (min-width: 768px) {
-	#display1 {
+	#printLayout > * {
+		float: left;
+	}
+	#layout1 {
+		width: 50%;
 		padding-right: 16px;
 		position: relative;
 	}
-	#display1:after {
-		display: block;
+	#layout1:after {
 		position: absolute;
 		width: 2em;
 		right: -1em;
-		top: 40px;
-		content: "\2716";
-		text-align: center;
+		top: 50%;
+		-webkit-transform: translateY(-50%);
+		-moz-transform: translateY(-50%);
+		transform: translateY(-50%);
 	}
-	#display2 {
+	#layout2 {
+		width: 50%;
 		padding-left: 16px;
 	}
+}
+
+/* Spinning icon for infinite scroll. */
+#pieces-end {
+	text-align: center;
+	padding: 4px;
+}
+#pieces-end .icon {
+	font-size: 32px;
+}
+.rotate-ccw {
+    -webkit-animation: rotate-ccw 2s infinite linear;
+    -moz-animation: rotate-ccw 2s infinite linear;
+    animation: rotate-ccw 2s infinite linear;
+}
+@-webkit-keyframes rotate-ccw {
+    from {-webkit-transform: rotate(359deg);}
+	to {-webkit-transform: rotate(0deg);}
+}
+@-moz-keyframes rotate-ccw {
+    from {-moz-transform: rotate(359deg);}
+	to {-moz-transform: rotate(0deg);}
+}
+@keyframes rotate-ccw {
+    from {transform: rotate(359deg);}
+	to {transform: rotate(0deg);}
 }
